@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import os
 import glob
 from datetime import datetime
+import imageio.v2 as imageio
 
 # 结果文件夹路径
 RESULTS_DIR = 'results'
@@ -25,10 +26,18 @@ os.makedirs(PLOTS_DIR, exist_ok=True)
 
 def process_state_files():
     """处理 state 文件"""
-    state_files = sorted(glob.glob(os.path.join(RESULTS_DIR, '*state*.dat')))
+    state_files = glob.glob(os.path.join(RESULTS_DIR, '*state*.dat'))
     if not state_files:
         print("未找到 state 文件")
         return
+    
+    # 按时间值排序文件
+    def get_time_from_filename(file_path):
+        filename = os.path.basename(file_path)
+        time_str = filename.split('-state-')[1].replace('.dat', '')
+        return float(time_str)
+    
+    state_files = sorted(state_files, key=get_time_from_filename)
     
     print(f"找到 {len(state_files)} 个 state 文件")
     
@@ -106,10 +115,18 @@ def process_state_files():
 
 def process_schlieren_files():
     """处理 schlieren 文件"""
-    schlieren_files = sorted(glob.glob(os.path.join(RESULTS_DIR, '*schlieren*.dat')))
+    schlieren_files = glob.glob(os.path.join(RESULTS_DIR, '*schlieren*.dat'))
     if not schlieren_files:
         print("未找到 schlieren 文件")
         return
+    
+    # 按时间值排序文件
+    def get_time_from_filename(file_path):
+        filename = os.path.basename(file_path)
+        time_str = filename.split('-schlieren-')[1].replace('.dat', '')
+        return float(time_str)
+    
+    schlieren_files = sorted(schlieren_files, key=get_time_from_filename)
     
     print(f"找到 {len(schlieren_files)} 个 schlieren 文件")
     
@@ -379,6 +396,51 @@ def create_comparison_plots():
             
             print(f"创建对比图完成 (分辨率: {resolution})")
 
+def create_gif():
+    """从生成的图像创建 GIF 动画"""
+    # 收集所有生成的图像
+    density_files = glob.glob(os.path.join(PLOTS_DIR, 'density_*.png'))
+    interface_files = glob.glob(os.path.join(PLOTS_DIR, 'interface_*.png'))
+    pressure_files = glob.glob(os.path.join(PLOTS_DIR, 'pressure_*.png'))
+    schlieren_files = glob.glob(os.path.join(PLOTS_DIR, 'schlieren_*.png'))
+    
+    # 按时间值排序文件
+    def get_time_from_image_filename(file_path):
+        filename = os.path.basename(file_path)
+        time_str = filename.split('_')[1].replace('.png', '')
+        return float(time_str)
+    
+    density_files = sorted(density_files, key=get_time_from_image_filename)
+    interface_files = sorted(interface_files, key=get_time_from_image_filename)
+    pressure_files = sorted(pressure_files, key=get_time_from_image_filename)
+    schlieren_files = sorted(schlieren_files, key=get_time_from_image_filename)
+    
+    # 为每种类型创建 GIF
+    gif_configs = [
+        (density_files, 'density_animation.gif', 'Density Field Animation'),
+        (interface_files, 'interface_animation.gif', 'Interface Location Animation'),
+        (pressure_files, 'pressure_animation.gif', 'Pressure Field Animation'),
+        (schlieren_files, 'schlieren_animation.gif', 'Schlieren Image Animation')
+    ]
+    
+    for files, output_filename, title in gif_configs:
+        if len(files) >= 2:
+            print(f"创建 {title} GIF...")
+            
+            # 读取图像
+            images = []
+            for file_path in files:
+                img = imageio.imread(file_path)
+                images.append(img)
+            
+            # 保存 GIF
+            output_path = os.path.join(PLOTS_DIR, output_filename)
+            imageio.mimsave(output_path, images, duration=0.1, loop=0)
+            
+            print(f"GIF 保存成功: {output_filename}")
+        else:
+            print(f"{title} 图像不足，无法创建 GIF")
+
 def main():
     print(f"开始处理结果文件 (时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')})")
     
@@ -388,6 +450,9 @@ def main():
     process_lineout_files()
     process_masschange_file()
     create_comparison_plots()
+    
+    # 创建 GIF 动画
+    create_gif()
     
     print(f"处理完成！结果保存在 {PLOTS_DIR} 文件夹中")
 
